@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WakeGuard - Advanced Driver Safety</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- MediaPipe loaded via module in monitor.js -->
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            const debugConsole = document.getElementById('debug-console');
+            if (debugConsole) {
+                debugConsole.style.display = 'block';
+                const line = document.createElement('div');
+                line.textContent = `Global Error: ${msg} at ${lineNo}:${columnNo}`;
+                line.style.color = 'red';
+                debugConsole.appendChild(line);
+                return false;
+            }
+            alert(`Global Error: ${msg} at ${lineNo}:${columnNo}`);
+            return false;
+        };
+    </script>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="brand">WakeGuard</div>
+            <div class="nav-links">
+                <button onclick="showPage('login-page')" class="nav-btn active">Overview</button>
+                <button onclick="showPage('monitor-page')" class="nav-btn">Monitor</button>
+                <button onclick="showPage('education-page')" class="nav-btn">Safety Data</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Phase 1.1: Login / Welcome -->
+        <section id="login-page" class="page active">
+            <div class="center-card fade-in">
+                <h1>Welcome to <span class="brand-text">WakeGuard</span></h1>
+                <p class="subtitle">Web-Based Safe Driving Awareness Platform</p>
+                <div class="form-group">
+                    <input type="text" id="driver-id" placeholder="Enter Driver ID" value="DemoUser_01">
+                    <button onclick="startPreTrip()" class="primary-btn">Begin Trip Verification</button>
+                </div>
+                <div class="tech-badge">
+                    <span>Powered by MediaPipe & ReflexAI</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 1.2: Mandatory Education -->
+        <section id="education-page" class="page">
+            <div class="center-card">
+                <h2>Safety Tip of the Day</h2>
+                <div class="tip-card">
+                    <div class="icon">💡</div>
+                    <p id="daily-tip">"Microsleeps can last significantly less than a second but detecting them early
+                        saves lives."</p>
+                </div>
+                <button onclick="acknowledgeTip()" class="primary-btn">I Acknowledge</button>
+            </div>
+
+            <!-- New Stats Section -->
+            <div class="stats-container fade-in delay-1">
+                <h3>Real-World Impact</h3>
+                <div class="stats-grid">
+                    <div class="stat-box warning">
+                        <span class="stat-number">328,000+</span>
+                        <p class="stat-label">Drowsy Driving Crashes Annually (AAA Estimate)</p>
+                    </div>
+                    <div class="stat-box danger">
+                        <span class="stat-number">6,400+</span>
+                        <p class="stat-label">Fatalities Per Year (AAA Foundation)</p>
+                    </div>
+                </div>
+                <div class="source-citation">
+                    <p>Sources: <strong>NHTSA</strong> (Official Reports) & <strong>AAA Foundation for Traffic
+                            Safety</strong> (In-Depth Crash Analysis, 2024).</p>
+                    <p class="small">While NHTSA official reports cite ~600 deaths, widely accepted research by AAA
+                        indicates the actual toll is 10x higher, involving nearly 18% of all traffic fatalities.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 1.3: Reflex Test (The Gatekeeper) -->
+        <section id="reflex-page" class="page">
+            <div class="reflex-container">
+                <div id="reflex-screen" class="reflex-screen waiting" onclick="handleReflexClick()">
+                    <div class="reflex-content">
+                        <h2 id="reflex-instruction">Wait for Green...</h2>
+                        <p id="reflex-sub">Tap immediately when the screen turns green.</p>
+                        <div id="reflex-result" class="hidden">0 ms</div>
+                    </div>
+                </div>
+                <div id="reflex-controls" class="hidden">
+                    <p id="reflex-status">Testing Reflexes...</p>
+                    <button id="retry-reflex" onclick="startReflexTest()" class="secondary-btn hidden">Retry
+                        Test</button>
+                    <button id="proceed-btn" onclick="completePhase1()" class="primary-btn hidden">Start
+                        Driving</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 2: In-Trip Monitor (The Co-Pilot) -->
+        <section id="monitor-page" class="page">
+            <div class="monitor-dashboard">
+                <div class="dashboard-header">
+                    <div class="status-indicator">
+                        <div id="status-dot" class="status-dot"></div>
+                        <span id="system-status">Standby</span>
+                    </div>
+                    <button id="toggle-cam" class="nav-btn">Start Camera</button>
+                </div>
+
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline></video>
+                    <canvas id="output_canvas"></canvas>
+                    <div id="drowsy-alert" class="alert-overlay hidden">
+                        <div class="alert-box">
+                            <h1>WAKE UP!</h1>
+                            <p>Drowsiness Detected</p>
+                        </div>
+                    </div>
+                    <!-- Darkness / Fail-Safe Overlay -->
+                    <div id="darkness-overlay" class="alert-overlay warning hidden">
+                        <div class="alert-box">
+                            <h1>LOW VISIBILITY</h1>
+                            <p>AI Paused. Stopping for Reflex Check...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <label>Alertness Level</label>
+                        <div class="value" id="alertness-level-display">--</div>
+                    </div>
+                    <div class="metric-card">
+                        <label>Lighting</label>
+                        <div class="value" id="light-value">--</div>
+                    </div>
+                </div>
+                <!-- Calibration Overlay inside monitor -->
+                <div id="calibration-overlay" class="alert-overlay info hidden">
+                    <div class="alert-box">
+                        <h1>Calibrating...</h1>
+                        <p>Please sit still and look at the road.</p>
+                        <div class="progress-bar-container">
+                            <div id="calibration-progress" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div id="debug-console"
+            style="position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: lime; font-family: monospace; font-size: 12px; padding: 10px; z-index: 9999; max-height: 150px; overflow-y: auto; display: none;">
+            <strong>Debug Log:</strong><br>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script type="module" src="js/monitor.js?v=2"></script>
+</body>
+
+</html>

@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-white overflow-x-hidden;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.05em;
+  }
+}
+
+@layer utilities {
+  .neon-text-cyan {
+    text-shadow: 0 0 5px #00f3ff, 0 0 10px #00f3ff, 0 0 20px #00f3ff;
+  }
+
+  .neon-text-magenta {
+    text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+  }
+
+  .neon-text-green {
+    text-shadow: 0 0 5px #0aff0a, 0 0 10px #0aff0a, 0 0 20px #0aff0a;
+  }
+
+  .neon-border-cyan {
+    box-shadow: 0 0 5px #00f3ff, inset 0 0 5px #00f3ff;
+    border: 1px solid #00f3ff;
+  }
+
+  .neon-border-magenta {
+    box-shadow: 0 0 5px #ff00ff, inset 0 0 5px #ff00ff;
+    border: 1px solid #ff00ff;
+  }
+
+  .neon-box {
+    @apply bg-black/80 backdrop-blur-sm border border-cyan-500/50;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+  }
+
+  .cyber-grid {
+    background-image: linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00f3ff;
+  border-radius: 0;
+  box-shadow: 0 0 10px #00f3ff;
+}
