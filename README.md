@@ -30,3 +30,42 @@ If you use VS Code:
 - `style.css`: All styling (Neon/Tech theme).
 - `js/monitor.js`: Core AI logic, camera handling, and audio system.
 - `js/app.js`: UI navigation and interactions.
+
+==================================================
+GITHUB PAGES HOSTING INSTRUCTIONS
+==================================================
+
+Once your code is on GitHub, here is exactly how to run this project perfectly 
+live on the internet for free using GitHub Pages:
+
+### Step 1: Enable GitHub Pages
+Because your project is pure HTML, CSS, and Vanilla JavaScript (no complex backends), 
+it runs directly on GitHub.
+
+1. Go to your GitHub repository in your web browser.
+2. Near the top right, click on the **Settings** tab.
+3. On the left sidebar menu, scroll down to the 'Code and automation' section and click **Pages**.
+4. Under the **"Build and deployment"** setup area:
+   - For **Source**, ensure it says 'Deploy from a branch'.
+   - Under **Branch**, change 'None' to **main**.
+   - Leave the folder dropdown as '/ (root)'.
+5. Click the **Save** button.
+
+### Step 2: Wait for Deployment
+1. GitHub will automatically start building your live website.
+2. Click the **Actions** tab at the top of your repo. You will see a workflow running.
+3. Wait 30 seconds to 1 minute until this turns into a green checkmark.
+
+### Step 3: View Your Live Website
+Once it completes:
+1. Go back to the **Settings > Pages** menu.
+2. At the top of the page, a new section will appear saying: 
+   "Your site is live at: https://[YourUsername].github.io/[RepositoryName]"
+3. Click that link!
+
+### Why this works perfectly "as is"
+Because this is a Vanilla HTML/JS/CSS app, GitHub immediately serves the `index.html` file 
+right away, handling all the complex Mediapipe WebAssembly logic right in the browser. 
+Furthermore, unlike opening an HTML file directly from your computer, GitHub provides an 
+https:// secured URL, meaning the browser will securely perfectly allow webcam access 
+identical to your local test environment.

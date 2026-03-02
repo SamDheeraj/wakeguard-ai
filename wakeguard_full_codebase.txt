@@ -1,0 +1,1767 @@
+Here is the full codebase for the WakeGuard project.
+
+==================================================
+FILE: index.html
+==================================================
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WakeGuard - Advanced Driver Safety</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- MediaPipe loaded via module in monitor.js -->
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            const debugConsole = document.getElementById('debug-console');
+            if (debugConsole) {
+                debugConsole.style.display = 'block';
+                const line = document.createElement('div');
+                line.textContent = `Global Error: ${msg} at ${lineNo}:${columnNo}`;
+                line.style.color = 'red';
+                debugConsole.appendChild(line);
+                return false;
+            }
+            alert(`Global Error: ${msg} at ${lineNo}:${columnNo}`);
+            return false;
+        };
+    </script>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="brand">WakeGuard</div>
+            <div class="nav-links">
+                <button onclick="showPage('login-page')" class="nav-btn active">Overview</button>
+                <button onclick="showPage('monitor-page')" class="nav-btn">Monitor</button>
+                <button onclick="showPage('education-page')" class="nav-btn">Safety Data</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Phase 1.1: Login / Welcome -->
+        <section id="login-page" class="page active">
+            <div class="center-card fade-in">
+                <h1>Welcome to <span class="brand-text">WakeGuard</span></h1>
+                <p class="subtitle">Web-Based Safe Driving Awareness Platform</p>
+                <div class="form-group">
+                    <input type="text" id="driver-id" placeholder="Enter Driver ID" value="DemoUser_01">
+                    <button onclick="startPreTrip()" class="primary-btn">Begin Trip Verification</button>
+                </div>
+                <div class="tech-badge">
+                    <span>Powered by MediaPipe & ReflexAI</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 1.2: Mandatory Education -->
+        <section id="education-page" class="page">
+            <div class="center-card">
+                <h2>Safety Tip of the Day</h2>
+                <div class="tip-card">
+                    <div class="icon">💡</div>
+                    <p id="daily-tip">"Microsleeps can last significantly less than a second but detecting them early
+                        saves lives."</p>
+                </div>
+                <button onclick="acknowledgeTip()" class="primary-btn">I Acknowledge</button>
+            </div>
+
+            <!-- New Stats Section -->
+            <div class="stats-container fade-in delay-1">
+                <h3>Real-World Impact</h3>
+                <div class="stats-grid">
+                    <div class="stat-box warning">
+                        <span class="stat-number">328,000+</span>
+                        <p class="stat-label">Drowsy Driving Crashes Annually (AAA Estimate)</p>
+                    </div>
+                    <div class="stat-box danger">
+                        <span class="stat-number">6,400+</span>
+                        <p class="stat-label">Fatalities Per Year (AAA Foundation)</p>
+                    </div>
+                </div>
+                <div class="source-citation">
+                    <p>Sources: <strong>NHTSA</strong> (Official Reports) & <strong>AAA Foundation for Traffic
+                            Safety</strong> (In-Depth Crash Analysis, 2024).</p>
+                    <p class="small">While NHTSA official reports cite ~600 deaths, widely accepted research by AAA
+                        indicates the actual toll is 10x higher, involving nearly 18% of all traffic fatalities.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 1.3: Reflex Test (The Gatekeeper) -->
+        <section id="reflex-page" class="page">
+            <div class="reflex-container">
+                <div id="reflex-screen" class="reflex-screen waiting" onclick="handleReflexClick()">
+                    <div class="reflex-content">
+                        <h2 id="reflex-instruction">Wait for Green...</h2>
+                        <p id="reflex-sub">Tap immediately when the screen turns green.</p>
+                        <div id="reflex-result" class="hidden">0 ms</div>
+                    </div>
+                </div>
+                <div id="reflex-controls" class="hidden">
+                    <p id="reflex-status">Testing Reflexes...</p>
+                    <button id="retry-reflex" onclick="startReflexTest()" class="secondary-btn hidden">Retry
+                        Test</button>
+                    <button id="proceed-btn" onclick="completePhase1()" class="primary-btn hidden">Start
+                        Driving</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 2: In-Trip Monitor (The Co-Pilot) -->
+        <section id="monitor-page" class="page">
+            <div class="monitor-dashboard">
+                <div class="dashboard-header">
+                    <div class="status-indicator">
+                        <div id="status-dot" class="status-dot"></div>
+                        <span id="system-status">Standby</span>
+                    </div>
+                    <button id="toggle-cam" class="nav-btn">Start Camera</button>
+                </div>
+
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline></video>
+                    <canvas id="output_canvas"></canvas>
+                    <div id="drowsy-alert" class="alert-overlay hidden">
+                        <div class="alert-box">
+                            <h1>WAKE UP!</h1>
+                            <p>Drowsiness Detected</p>
+                        </div>
+                    </div>
+                    <!-- Darkness / Fail-Safe Overlay -->
+                    <div id="darkness-overlay" class="alert-overlay warning hidden">
+                        <div class="alert-box">
+                            <h1>LOW VISIBILITY</h1>
+                            <p>AI Paused. Stopping for Reflex Check...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <label>Alertness Level</label>
+                        <div class="value" id="alertness-level-display">--</div>
+                    </div>
+                    <div class="metric-card">
+                        <label>Lighting</label>
+                        <div class="value" id="light-value">--</div>
+                    </div>
+                </div>
+                <!-- Calibration Overlay inside monitor -->
+                <div id="calibration-overlay" class="alert-overlay info hidden">
+                    <div class="alert-box">
+                        <h1>Calibrating...</h1>
+                        <p>Please sit still and look at the road.</p>
+                        <div class="progress-bar-container">
+                            <div id="calibration-progress" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div id="debug-console"
+            style="position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: lime; font-family: monospace; font-size: 12px; padding: 10px; z-index: 9999; max-height: 150px; overflow-y: auto; display: none;">
+            <strong>Debug Log:</strong><br>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script type="module" src="js/monitor.js?v=2"></script>
+</body>
+
+</html>
+
+==================================================
+FILE: style.css
+==================================================
+
+:root {
+    --bg-body: #f8f9fa;
+    --text-primary: #1a1a1a;
+    --text-secondary: #666;
+    --accent-gradient: linear-gradient(135deg, #2563eb, #7c3aed);
+    /* Blue to Purple */
+    --accent-glow: rgba(124, 58, 237, 0.3);
+    --white: #ffffff;
+    --glass: rgba(255, 255, 255, 0.7);
+    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+    --font-main: 'Inter', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    background-color: var(--bg-body);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Background Blob */
+body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.1) 0%, rgba(124, 58, 237, 0.05) 40%, transparent 70%);
+    border-radius: 50%;
+    z-index: -1;
+    animation: float 20s infinite ease-in-out;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(-50px, 50px);
+    }
+}
+
+/* Navbar */
+.navbar {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 100;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.nav-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+}
+
+.nav-links {
+    display: flex;
+    gap: 32px;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    font-family: var(--font-main);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.nav-btn:hover,
+.nav-btn.active {
+    color: #2563eb;
+}
+
+/* Pages */
+.page {
+    display: none;
+    padding-top: 64px;
+    min-height: 100vh;
+    animation: fadeIn 0.6s ease-out;
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Structure --- */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    overflow-y: auto;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+.page.active {
+    display: flex;
+    /* Changed to flex for centering */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+}
+
+/* --- Login & Education --- */
+.center-card {
+    background: var(--card-bg);
+    padding: 3rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.brand-text {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.tip-card {
+    background: rgba(255, 200, 0, 0.1);
+    border: 1px solid rgba(255, 200, 0, 0.3);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+    color: #FFD700;
+}
+
+.tip-card .icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* --- Reflex Test --- */
+.reflex-container {
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+}
+
+.reflex-screen {
+    height: 300px;
+    background: #333;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    user-select: none;
+    position: relative;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+/* --- Calibration UI --- */
+.alert-overlay.info .alert-box {
+    background: rgba(59, 130, 246, 0.9);
+    border-color: #3b82f6;
+    color: white;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+    margin-top: 15px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: #ffffff;
+    transition: width 0.2s ease;
+}
+
+.reflex-screen.waiting {
+    background: #2a2a2a;
+}
+
+.reflex-screen.ready {
+    background: #ff4757;
+}
+
+/* Red - Wait */
+.reflex-screen.go {
+    background: #2ed573;
+}
+
+/* Green - Click! */
+
+.reflex-content h2 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+#reflex-result {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-top: 1rem;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* --- Monitor Dashboard --- */
+.monitor-dashboard {
+    width: 100%;
+    max-width: 1000px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    background: var(--card-bg);
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: black;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.metric-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.metric-card .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-top: 0.5rem;
+}
+
+/* --- Alerts --- */
+.alert-overlay.warning .alert-box {
+    background: rgba(255, 165, 0, 0.9);
+    border-color: #FF8C00;
+}
+
+.alert-overlay.warning h1 {
+    color: #fff;
+}
+
+/* Home Page */
+.hero-section {
+    height: calc(100vh - 64px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+}
+
+.hero-text h1 {
+    font-size: 4.5rem;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #4a4a4a 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    font-size: 1.25rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin-bottom: 48px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.cta-wrapper {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+
+.primary-btn {
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.secondary-btn {
+    background: white;
+    color: #1a1a1a;
+    border: 1px solid #e5e5e5;
+    padding: 14px 32px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.secondary-btn:hover {
+    border-color: #d4d4d4;
+    background: #fafafa;
+    text-decoration: none;
+}
+
+/* Monitor Page */
+.monitor-section,
+.education-section {
+    max-width: 980px;
+    margin: 60px auto;
+    padding: 0 22px;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 60px;
+}
+
+.section-header h2 {
+    font-size: 48px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.section-header p {
+    font-size: 21px;
+    color: var(--text-secondary);
+}
+
+.monitor-display {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+#webcam,
+#output_canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#output_canvas {
+    z-index: 10;
+}
+
+.status-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 20;
+}
+
+.status-pill {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff9500;
+    /* Standby Orange */
+}
+
+.status-dot.active {
+    background: #34c759;
+}
+
+/* Active Green */
+.status-dot.error {
+    background: #ff3b30;
+}
+
+/* Error Red */
+
+.alert-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    animation: pulse 1s infinite;
+}
+
+.alert-overlay.hidden {
+    display: none;
+}
+
+.alert-content {
+    text-align: center;
+    color: white;
+}
+
+.alert-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.alert-content h3 {
+    font-size: 32px;
+    font-weight: 600;
+}
+
+.control-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.metrics {
+    display: flex;
+    gap: 24px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.metric-value {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+/* Education Page */
+.cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.info-card {
+    background: white;
+    padding: 32px;
+    border-radius: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.info-card h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 24px;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+input[type="range"] {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.alertness-indicator {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.good {
+    color: #34c759;
+    font-weight: 600;
+}
+
+.bad {
+    color: #ff3b30;
+    font-weight: 600;
+}
+
+.warn {
+    color: #ff9500;
+    font-weight: 600;
+}
+
+.stat-big {
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.stat-desc {
+    color: var(--text-secondary);
+    font-size: 17px;
+}
+
+@keyframes pulse {
+    0% {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    50% {
+        background: rgba(255, 59, 48, 0.3);
+    }
+
+    100% {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .hero-text h1 {
+        font-size: 40px;
+    }
+
+    .cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .control-bar {
+        flex-direction: column;
+        gap: 16px;
+    }
+}
+
+/* --- Stats Section (New) --- */
+.stats-container {
+    max-width: 800px;
+    margin-top: 3rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    padding: 2rem;
+    border-radius: 20px;
+}
+
+.stats-container h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-box {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat-number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+.stat-box.warning .stat-number {
+    color: #f59e0b;
+}
+
+.stat-box.danger .stat-number {
+    color: #ef4444;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.source-citation {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 1rem;
+}
+
+.source-citation .small {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    opacity: 0.8;
+}
+
+==================================================
+FILE: js/app.js
+==================================================
+
+// Navigation Logic
+// --- State Management ---
+const pages = ['login-page', 'education-page', 'reflex-page', 'monitor-page'];
+let currentState = 'login-page';
+
+function showPage(pageId) {
+    pages.forEach(id => {
+        const pageElement = document.getElementById(id);
+        if (pageElement) {
+            pageElement.classList.remove('active');
+        }
+    });
+    const targetPageElement = document.getElementById(pageId);
+    if (targetPageElement) {
+        targetPageElement.classList.add('active');
+    }
+    currentState = pageId;
+
+    // Auto-init specific pages
+    if (pageId === 'reflex-page') {
+        startReflexTest();
+    }
+}
+
+// --- Phase 1: Pre-Trip Verification ---
+function startPreTrip() {
+    const driverIdInput = document.getElementById('driver-id');
+    const driverId = driverIdInput ? driverIdInput.value : ''; // Handle case where element might not exist
+    if (driverId.length < 3) {
+        alert("Please enter a valid Driver ID");
+        return;
+    }
+    // Simulate login success
+    localStorage.setItem('driverId', driverId);
+    showPage('education-page');
+}
+
+function acknowledgeTip() {
+    showPage('reflex-page');
+}
+
+// --- Phase 1.3: Reflex Test Logic (PVT) ---
+const reflexScreen = document.getElementById('reflex-screen');
+const reflexInstruction = document.getElementById('reflex-instruction');
+const reflexSub = document.getElementById('reflex-sub');
+const reflexResult = document.getElementById('reflex-result');
+const reflexControls = document.getElementById('reflex-controls');
+const proceedBtn = document.getElementById('proceed-btn');
+const retryBtn = document.getElementById('retry-reflex');
+
+let reflexStartTime;
+let reflexTimer;
+let isWaitingForReflex = false;
+
+function handleReflexClick() {
+    if (isWaitingForReflex) {
+        // Clicked too early
+        failReflex("Too early! Wait for green.");
+        clearTimeout(reflexTimer);
+        isWaitingForReflex = false;
+    } else if (reflexScreen && reflexScreen.classList.contains('go')) { // Check reflexScreen exists
+        // Correct click
+        let reactionTime = performance.now() - reflexStartTime;
+        endReflexTest(reactionTime);
+    }
+}
+
+function startReflexTest() {
+    // Reset UI
+    if (reflexScreen) reflexScreen.className = 'reflex-screen waiting';
+    if (reflexScreen) reflexScreen.onclick = handleReflexClick; // Ensure click handler is active
+    if (reflexInstruction) reflexInstruction.textContent = 'Wait for Green...';
+    if (reflexSub) reflexSub.textContent = 'Tap immediately when it turns green.';
+    if (reflexResult) reflexResult.classList.add('hidden');
+    if (reflexControls) reflexControls.classList.add('hidden');
+
+    isWaitingForReflex = true;
+
+    // Random delay between 2000ms and 5000ms
+    const randomDelay = Math.floor(Math.random() * 3000) + 2000;
+
+    reflexTimer = setTimeout(() => {
+        if (reflexScreen) reflexScreen.className = 'reflex-screen go';
+        if (reflexInstruction) reflexInstruction.textContent = 'CLICK NOW!';
+        reflexStartTime = performance.now();
+        isWaitingForReflex = false;
+    }, randomDelay);
+}
+
+function failReflex(reason) {
+    if (reflexScreen) reflexScreen.className = 'reflex-screen ready'; // Redish
+    if (reflexInstruction) reflexInstruction.textContent = 'TEST FAILED';
+    if (reflexSub) reflexSub.textContent = reason;
+    if (reflexControls) reflexControls.classList.remove('hidden');
+    if (proceedBtn) proceedBtn.classList.add('hidden');
+    if (retryBtn) retryBtn.classList.remove('hidden');
+}
+
+function endReflexTest(time) {
+    if (reflexScreen) reflexScreen.className = 'reflex-screen';
+    if (reflexScreen) reflexScreen.onclick = null; // Disable clicks
+
+    // Display result
+    if (reflexResult) {
+        reflexResult.textContent = Math.floor(time) + ' ms';
+        reflexResult.classList.remove('hidden');
+    }
+
+    if (time <= 600) {
+        if (reflexInstruction) reflexInstruction.textContent = 'PASSED';
+        if (reflexSub) reflexSub.textContent = 'Your reflexes are sharp.';
+        if (reflexControls) reflexControls.classList.remove('hidden');
+        if (proceedBtn) proceedBtn.classList.remove('hidden');
+        if (retryBtn) retryBtn.classList.add('hidden');
+    } else {
+        if (reflexInstruction) reflexInstruction.textContent = 'FAILED';
+        if (reflexSub) reflexSub.textContent = 'Reaction too slow (>600ms). Unsafe to drive.';
+        if (reflexControls) reflexControls.classList.remove('hidden');
+        if (proceedBtn) proceedBtn.classList.add('hidden');
+        if (retryBtn) retryBtn.classList.remove('hidden');
+    }
+}
+
+function completePhase1() {
+    // Check if we are returning from a "Fail-Safe" check in monitoring
+    if (window.failSafeCallback) {
+        window.failSafeCallback();
+        window.failSafeCallback = null;
+    }
+    showPage('monitor-page');
+
+    // Auto-start camera if available
+    if (window.startCamera) {
+        window.startCamera();
+    } else {
+        // Fallback or retry if module hasn't loaded yet
+        setTimeout(() => {
+            if (window.startCamera) window.startCamera();
+        }, 1000);
+    }
+}
+
+// Initial Setup
+const dailyTips = [
+    "Microsleeps can last significantly less than a second but detecting them early saves lives.",
+    "Driving efficiently means no speeding, no hard braking, and staying awake.",
+    "Fatigue is a major factor in 20% of all road accidents.",
+    "Take a break every 2 hours when driving long distances."
+];
+const dailyTipElement = document.getElementById('daily-tip');
+if (dailyTipElement) {
+    dailyTipElement.textContent = dailyTips[Math.floor(Math.random() * dailyTips.length)];
+}
+
+// Make functions global for inline button clicks
+window.startPreTrip = startPreTrip;
+window.acknowledgeTip = acknowledgeTip;
+window.handleReflexClick = handleReflexClick;
+window.startReflexTest = startReflexTest;
+window.completePhase1 = completePhase1;
+window.showPage = showPage;
+
+// Education Page Logic
+const timeSlider = document.getElementById('time-slider');
+const timeDisplay = document.getElementById('time-display');
+const alertnessValue = document.getElementById('alertness-value');
+
+if (timeSlider && timeDisplay && alertnessValue) { // Ensure all elements exist
+    timeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        const ampm = val >= 12 ? 'PM' : 'AM';
+        const displayVal = val % 12 || 12;
+        timeDisplay.textContent = `${displayVal}:00 ${ampm} `;
+
+        // Simple circadian logic
+        if (val >= 23 || val <= 5) {
+            alertnessValue.textContent = "Low";
+            alertnessValue.className = "metric-value bad";
+        } else if (val >= 13 && val <= 15) {
+            alertnessValue.textContent = "Moderate";
+            alertnessValue.className = "metric-value warn";
+        } else {
+            alertnessValue.textContent = "High";
+            alertnessValue.className = "metric-value good";
+        }
+    });
+}
+
+
+==================================================
+FILE: js/monitor.js
+==================================================
+
+import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/+esm";
+
+// CONFIGURATION 
+const CONFIG = {
+    // 1. Thresholds
+    EAR_THRESHOLD_CLOSED: 0.22,     // Default "eyes closed" EAR (calibrated later)
+    PERCLOS_THRESHOLD: 0.15,        // 15% eye closure over time = drowsy (Industry Std)
+    MICROSLEEP_THRESHOLD_MS: 400,   // Single blink longer than this = warning
+
+    // 2. Windows & Timing
+    CALIBRATION_DURATION_MS: 60000, // 60 Seconds strict calibration
+    WINDOW_SIZE_MS: 60000,          // Rolling window for PERCLOS (1 minute)
+    DEBUG_LOG_INTERVAL: 60
+};
+
+// --- STATE MANAGEMENT ---
+const state = {
+    model: null,
+    isModelLoaded: false,
+    webcamRunning: false,
+
+    // Calibration
+    isCalibrating: false,
+    calibrationStartTime: 0,
+    calibrationData: {
+        earSum: 0,
+        frameCount: 0,
+        blinkCount: 0,
+        blinkDurations: []
+    },
+    userBaseline: {
+        ear: 0.28,             // Default fallback
+        blinkRate: 15,         // Blinks per minute
+        avgBlinkDuration: 150  // ms
+    },
+
+    // Real-time Metrics
+    lastFrameTime: 0,
+
+    // Blink Detection State Machine
+    blinkState: 'OPEN', // OPEN -> CLOSING -> CLOSED -> OPENING
+    currentBlinkStart: 0,
+
+    // Circular Buffers for Temporal Analysis
+    history: {
+        timestamps: [],    // Time of each frame
+        isClosed: [],      // Boolean: was eye closed in this frame?
+        blinks: []         // Timestamp of every completed blink
+    },
+
+    // Status
+    drowsinessScore: 0, // 0-100
+    isAlerting: false,
+    reason: ""
+};
+
+// --- DOM ELEMENTS (Unchanged) ---
+const DOM = {
+    video: document.getElementById("webcam"),
+    canvas: document.getElementById("output_canvas"),
+    ctx: document.getElementById("output_canvas").getContext("2d", { willReadFrequently: true }),
+    btnToggle: document.getElementById("toggle-cam"),
+    statusText: document.getElementById("system-status"),
+    statusDot: document.getElementById("status-dot"),
+    alertnessDisplay: document.getElementById("alertness-level-display"),
+    overlays: {
+        alert: document.getElementById("drowsy-alert"),
+        calibration: document.getElementById("calibration-overlay"),
+        progressBar: document.getElementById("calibration-progress"),
+        darkness: document.getElementById("darkness-overlay")
+    },
+    debug: document.getElementById("debug-console")
+};
+
+// --- AUDIO SYSTEM (Unchanged) ---
+const AudioSys = {
+    ctx: null,
+    osc: null,
+    lfo: null,
+    gain: null,
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+    },
+
+    speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.2;
+            utterance.pitch = 1.1;
+            utterance.volume = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    },
+
+    startSiren() {
+        if (state.isAlerting || this.osc) return;
+        this.init();
+        if (!this.ctx) return;
+
+        this.osc = this.ctx.createOscillator();
+        this.lfo = this.ctx.createOscillator();
+        this.lfoGain = this.ctx.createGain();
+        this.gain = this.ctx.createGain();
+
+        this.lfo.type = 'triangle';
+        this.lfo.frequency.value = 4;
+        this.lfoGain.gain.value = 300;
+
+        this.osc.type = 'sawtooth';
+        this.osc.frequency.value = 800;
+
+        this.lfo.connect(this.lfoGain);
+        this.lfoGain.connect(this.osc.frequency);
+        this.osc.connect(this.gain);
+        this.gain.connect(this.ctx.destination);
+
+        this.gain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.gain.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.1);
+
+        this.lfo.start();
+        this.osc.start();
+    },
+
+    stopSiren() {
+        const now = this.ctx ? this.ctx.currentTime : 0;
+        if (this.gain) {
+            try { this.gain.gain.linearRampToValueAtTime(0, now + 0.1); } catch (e) { }
+        }
+        setTimeout(() => {
+            if (this.osc) { try { this.osc.stop(); this.osc.disconnect(); } catch (e) { } this.osc = null; }
+            if (this.lfo) { try { this.lfo.stop(); this.lfo.disconnect(); } catch (e) { } this.lfo = null; }
+        }, 150);
+    }
+};
+
+// LOGGING 
+function log(msg, error = false) {
+    console.log(`[WakeGuard] ${msg}`);
+}
+
+// INITIALIZATION
+async function initModel() {
+    try {
+        log("Loading AI Vision Model...");
+        DOM.statusText.textContent = "Loading AI...";
+        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm");
+        state.model = await FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                delegate: "CPU"
+            },
+            outputFaceBlendshapes: true,
+            runningMode: "VIDEO",
+            numFaces: 1
+        });
+        state.isModelLoaded = true;
+        log("AI Model Ready.");
+        DOM.statusText.textContent = "Standby";
+        DOM.btnToggle.onclick = toggleCamera;
+    } catch (e) {
+        log("Model Failed: " + e.message, true);
+        alert("Failed to load AI. Please refresh.");
+    }
+}
+
+// CAMERA CONTROL 
+async function toggleCamera() {
+    if (!state.isModelLoaded) { alert("Please wait for AI to load."); return; }
+
+    if (state.webcamRunning) {
+        // STOP
+        state.webcamRunning = false;
+        DOM.btnToggle.innerText = "Start Camera";
+        DOM.statusText.textContent = "Standby";
+        DOM.statusDot.className = "status-dot";
+        DOM.video.pause();
+        if (DOM.video.srcObject) {
+            DOM.video.srcObject.getTracks().forEach(t => t.stop());
+            DOM.video.srcObject = null;
+        }
+        DOM.ctx.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+        AudioSys.stopSiren();
+        resetUI();
+    } else {
+        // START
+        try {
+            AudioSys.init();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            DOM.video.srcObject = stream;
+            DOM.video.setAttribute("playsinline", true);
+            await DOM.video.play();
+
+            state.webcamRunning = true;
+            DOM.btnToggle.innerText = "Stop Camera";
+            DOM.statusText.textContent = "Active Monitoring";
+            DOM.statusDot.className = "status-dot active";
+
+            // RESET STATE
+            state.blinkState = 'OPEN';
+            state.history.timestamps = [];
+            state.history.isClosed = [];
+            state.history.blinks = [];
+            state.isAlerting = false;
+
+            log("Camera Started. AI Loop Beginning.");
+            requestAnimationFrame(predictLoop);
+
+        } catch (e) {
+            log("Camera Error: " + e.message, true);
+            alert("Camera Access Denied.");
+        }
+    }
+}
+
+// MAIN PREDICTION LOOP
+async function predictLoop() {
+    if (!state.webcamRunning) return;
+
+    try {
+        if (DOM.video.videoWidth > 0 && DOM.canvas.width !== DOM.video.videoWidth) {
+            DOM.canvas.width = DOM.video.videoWidth;
+            DOM.canvas.height = DOM.video.videoHeight;
+        }
+        DOM.ctx.drawImage(DOM.video, 0, 0, DOM.canvas.width, DOM.canvas.height);
+
+        const now = performance.now();
+        state.lastFrameTime = now;
+
+        let results = null;
+        if (state.model) {
+            results = state.model.detectForVideo(DOM.video, now);
+        }
+
+        if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
+            const landmarks = results.faceLandmarks[0];
+            const ear = calculateEAR(landmarks);
+
+            // Draw
+            drawEye(landmarks, [33, 160, 158, 133, 153, 144]);
+            drawEye(landmarks, [362, 385, 387, 263, 373, 380]);
+
+            // CORE LOGIC SWITCH
+            if (!state.isCalibrating && state.userBaseline.ear === 0.28) { // Default value check
+                startCalibration(now);
+            }
+
+            if (state.isCalibrating) {
+                runCalibration(ear, now);
+            } else {
+                runAdvancedMonitoring(ear, now);
+            }
+
+        } else {
+            // No Face
+            AudioSys.stopSiren();
+            DOM.ctx.fillStyle = "red";
+            DOM.ctx.font = "bold 30px Arial";
+            DOM.ctx.fillText("NO FACE DETECTED", DOM.canvas.width / 2 - 140, DOM.canvas.height / 2);
+
+            // If we lose face during calibration, we should probably pause/abort, 
+            // but for now let's just ignore the frame.
+            if (state.isCalibrating) {
+                DOM.ctx.fillText("KEEP FACE VISIBLE", DOM.canvas.width / 2 - 130, DOM.canvas.height / 2 + 50);
+            }
+        }
+    } catch (e) {
+        console.error("Loop Error:", e);
+    }
+
+    requestAnimationFrame(predictLoop);
+}
+
+// --------------------------------------------------------------------------
+// --- ADVANCED LOGIC: CALIBRATION ---
+// --------------------------------------------------------------------------
+
+function startCalibration(now) {
+    state.isCalibrating = true;
+    state.calibrationStartTime = now;
+    state.calibrationData = { earSum: 0, frameCount: 0, blinkCount: 0, blinkDurations: [] };
+    DOM.overlays.calibration.classList.remove('hidden');
+    log("Starting 60s Calibration...");
+}
+
+function runCalibration(ear, now) {
+    const elapsed = now - state.calibrationStartTime;
+    const progress = Math.min((elapsed / CONFIG.CALIBRATION_DURATION_MS) * 100, 100);
+
+    // 1. Collect EAR Data
+    state.calibrationData.earSum += ear;
+    state.calibrationData.frameCount++;
+
+    // 2. Track Blinks (Simplistic Check for Calibration)
+    // We use a hardcoded safe threshold for calibration detection to just count them
+    // Users are asked to look normally.
+    const isClosed = ear < 0.22;
+    trackBlinkEvent(isClosed, now, true); // record blink data into temp state
+
+    // 3. UI Updates
+    DOM.overlays.progressBar.style.width = `${progress}%`;
+    DOM.ctx.fillStyle = "yellow";
+    DOM.ctx.font = "20px Arial";
+    DOM.ctx.fillText(`CALIBRATING: ${Math.round(progress)}%`, 20, 60);
+    DOM.ctx.fillText(`BLINKS: ${state.calibrationData.blinkCount}`, 20, 90);
+
+    // 4. Complete
+    if (elapsed >= CONFIG.CALIBRATION_DURATION_MS) {
+        finishCalibration();
+    }
+}
+
+function finishCalibration() {
+    state.isCalibrating = false;
+    DOM.overlays.calibration.classList.add('hidden');
+
+    const d = state.calibrationData;
+
+    // Avg EAR
+    const avgEAR = d.earSum / d.frameCount;
+
+    // Avg Blink Duration
+    const avgDur = d.blinkDurations.length > 0
+        ? d.blinkDurations.reduce((a, b) => a + b, 0) / d.blinkDurations.length
+        : 150; // default fallout
+
+    // Blink Rate (Blinks per min)
+    // We ran for CONFIG.CALIBRATION_DURATION_MS (60s), so count is the rate.
+    const rate = d.blinkCount;
+
+    // Set Baseline
+    state.userBaseline = {
+        ear: avgEAR,
+        blinkRate: Math.max(rate, 5), // Min safe floor
+        avgBlinkDuration: avgDur
+    };
+
+    // Set dynamic threshold based on baseline (e.g. 75% of open eyes)
+    // But never higher than 0.28 or lower than 0.18 for safety
+    state.userBaselineEAR = avgEAR; // Keep legacy variable for generic reference
+    CONFIG.EAR_THRESHOLD_CLOSED = Math.min(Math.max(avgEAR * 0.75, 0.18), 0.28);
+
+    log(`Calibration Done. EAR: ${avgEAR.toFixed(3)}, Rate: ${rate} bpm, Dur: ${avgDur.toFixed(0)}ms`);
+    AudioSys.speak("Calibration Complete. Active Monitoring Started.");
+}
+
+
+// ADVANCED LOGIC: MONITORING (PERCLOS + TEMPORAL)
+
+
+function runAdvancedMonitoring(ear, now) {
+    // 1. Detect Eye State
+    const isClosed = ear < CONFIG.EAR_THRESHOLD_CLOSED;
+
+    // 2. Update Temporal History (Circular Buffers)
+    updateHistoryBuffers(now, isClosed);
+
+    // 3. Track Individual Blinks
+    const currentBlinkDuration = trackBlinkEvent(isClosed, now, false);
+
+    // 4. Calculate Metrics
+    const perclos = calculatePerclos(); // 0.0 to 1.0
+    const blinkRate = calculateBlinkRate(now); // blinks/min
+
+    // 5. Visualize Debug Data on Canvas
+    // DOM.ctx.fillStyle = isClosed ? "red" : "lime";
+    // DOM.ctx.fillText(`EAR: ${ear.toFixed(3)}`, 20, 30);
+    DOM.ctx.fillStyle = "white";
+    DOM.ctx.fillText(`PERCLOS: ${(perclos * 100).toFixed(1)}%`, 20, 30);
+    DOM.ctx.fillText(`RATE: ${blinkRate.toFixed(1)} bpm`, 20, 60);
+
+    // 6. Evaluate Drowsiness (The Decision Logic)
+    evaluateDrowsiness(perclos, blinkRate, currentBlinkDuration);
+}
+
+function updateHistoryBuffers(now, isClosed) {
+    // Add new frame
+    state.history.timestamps.push(now);
+    state.history.isClosed.push(isClosed);
+
+    // Clean old frames > WINDOW_SIZE_MS
+    while (state.history.timestamps.length > 0 &&
+        (now - state.history.timestamps[0]) > CONFIG.WINDOW_SIZE_MS) {
+        state.history.timestamps.shift();
+        state.history.isClosed.shift();
+    }
+}
+
+function trackBlinkEvent(isClosed, now, isCalibration) {
+    // State machine to capture full blinks and duration
+    let duration = 0;
+
+    if (state.blinkState === 'OPEN' && isClosed) {
+        state.blinkState = 'CLOSED';
+        state.currentBlinkStart = now;
+    } else if (state.blinkState === 'CLOSED') {
+        duration = now - state.currentBlinkStart;
+
+        if (!isClosed) {
+            // Blink Finished
+            state.blinkState = 'OPEN';
+
+            // Register Blink
+            if (duration > 50) { // Filter noise < 50ms
+                if (isCalibration) {
+                    state.calibrationData.blinkCount++;
+                    state.calibrationData.blinkDurations.push(duration);
+                } else {
+                    state.history.blinks.push(now);
+                    // Filter old blinks
+                    while (state.history.blinks.length > 0 &&
+                        (now - state.history.blinks[0]) > CONFIG.WINDOW_SIZE_MS) {
+                        state.history.blinks.shift();
+                    }
+                }
+            }
+        }
+    }
+    return duration; // Returns current closure duration if closed, else 0
+}
+
+function calculatePerclos() {
+    if (state.history.isClosed.length === 0) return 0;
+
+    let closedFrames = 0;
+    for (let c of state.history.isClosed) {
+        if (c) closedFrames++;
+    }
+    return closedFrames / state.history.isClosed.length;
+}
+
+function calculateBlinkRate(now) {
+    // state.history.blinks contains timestamps of blinks in the last 60s
+    // So the length is literally the rate per minute
+    return state.history.blinks.length;
+}
+
+function evaluateDrowsiness(perclos, currentRate, currentClosedDuration) {
+    // --- CRITERIA ---
+
+    // 1. MICROSLEEP (Immediate Danger)
+    if (currentClosedDuration > CONFIG.MICROSLEEP_THRESHOLD_MS) {
+        triggerAlert("MICROSLEEP DETECTED!");
+        return;
+    }
+
+    // 2. PERCLOS (Fatigue Trend)
+    // Industry standard: > 0.15 (15%) is drowsy. > 0.30 is severe.
+    if (perclos > CONFIG.PERCLOS_THRESHOLD) {
+        // Visualize Danger
+        const severity = Math.min((perclos - CONFIG.PERCLOS_THRESHOLD) * 10, 1); // 0-1 scale
+        DOM.alertnessDisplay.className = "value bad";
+
+        if (perclos > 0.25) {
+            triggerAlert("HIGH FATIGUE (PERCLOS)");
+            return;
+        }
+    }
+
+    // 3. LOW BLINK RATE (Staring / Cognitive Failure)
+    // If rate drops to < 50% of baseline
+    if (state.userBaseline.blinkRate > 0 && currentRate < (state.userBaseline.blinkRate * 0.5)) {
+        if (currentRate < 5) { // Absolute floor
+            DOM.ctx.fillText("LOW BLINK RATE", 20, 120);
+        }
+    }
+
+    // If we are here, we are safe(-ish)
+    if (state.isAlerting) clearAlert();
+
+    // Update UI Score (Inverse of PERCLOS basically)
+    const safetyScore = Math.max(100 - (perclos * 400), 0);
+    DOM.alertnessDisplay.textContent = `${Math.round(safetyScore)}%`;
+    DOM.alertnessDisplay.className = safetyScore < 70 ? "value bad" : (safetyScore < 90 ? "value warn" : "value good");
+}
+
+
+// ALERT SYSTEM
+
+
+function triggerAlert(reason) {
+    if (!state.isAlerting) {
+        state.isAlerting = true;
+        state.reason = reason;
+        DOM.overlays.alert.classList.remove('hidden');
+
+        // Update Overlay Text
+        const alertTitle = DOM.overlays.alert.querySelector('h1');
+        if (alertTitle) alertTitle.textContent = reason;
+
+        AudioSys.startSiren();
+        AudioSys.speak("Wake up! " + reason);
+    }
+}
+
+function clearAlert() {
+    if (state.isAlerting) {
+        state.isAlerting = false;
+        DOM.overlays.alert.classList.add('hidden');
+        AudioSys.stopSiren();
+    }
+}
+
+function resetUI() {
+    DOM.alertnessDisplay.textContent = "--";
+    DOM.overlays.alert.classList.add('hidden');
+    DOM.overlays.calibration.classList.add('hidden');
+}
+
+
+// --- MATH & UTILS ---
+function calculateEAR(landmarks) {
+    const leftEye = [33, 160, 158, 133, 153, 144];
+    const rightEye = [362, 385, 387, 263, 373, 380];
+    return (getEyeRatio(landmarks, leftEye) + getEyeRatio(landmarks, rightEye)) / 2;
+}
+
+function getEyeRatio(landmarks, indices) {
+    const v1 = dist(landmarks[indices[1]], landmarks[indices[5]]);
+    const v2 = dist(landmarks[indices[2]], landmarks[indices[4]]);
+    const h = dist(landmarks[indices[0]], landmarks[indices[3]]);
+    return (v1 + v2) / (2.0 * h);
+}
+
+function dist(p1, p2) {
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+}
+
+function drawEye(landmarks, indices) {
+    DOM.ctx.beginPath();
+    const w = DOM.canvas.width;
+    const h = DOM.canvas.height;
+    DOM.ctx.moveTo(landmarks[indices[0]].x * w, landmarks[indices[0]].y * h);
+    for (let i = 1; i < indices.length; i++) {
+        DOM.ctx.lineTo(landmarks[indices[i]].x * w, landmarks[indices[i]].y * h);
+    }
+    DOM.ctx.closePath();
+    DOM.ctx.strokeStyle = '#39ff14';
+    DOM.ctx.lineWidth = 2;
+    DOM.ctx.stroke();
+}
+
+//  BOOTSTRAP 
+window.startCamera = toggleCamera;
+initModel();
+
+
+==================================================
+FILE: README.md
+==================================================
+
+# WakeGuard AI (Vanilla JS Version)
+
+A premium, privacy-focused driver drowsiness detection system running entirely in the browser.
+
+## Features
+- **Real-time Drowsiness Detection**: Uses MediaPipe Face Landmarker to track eye openness (EAR).
+- **Smart Alerts**: Filters out normal blinks and triggers a siren only for sustained drowsiness.
+- **Premium Design**: Modern, "Tech Gradient" aesthetic with smooth animations.
+- **Privacy First**: All processing happens locally on your device. No video is sent to the cloud.
+
+## How to Run
+Since this is a static HTML/JS application, you need a local server to access the camera (due to browser security restrictions on `file://` URLs).
+
+### Option 1: Python (Recommended)
+If you have Python installed:
+1.  Open a terminal in this folder.
+2.  Run:
+    ```bash
+    python3 -m http.server
+    ```
+3.  Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+### Option 2: VS Code Live Server
+If you use VS Code:
+1.  Install the "Live Server" extension.
+2.  Right-click `index.html` and select "Open with Live Server".
+
+## File Structure
+- `index.html`: Main entry point and layout.
+- `style.css`: All styling (Neon/Tech theme).
+- `js/monitor.js`: Core AI logic, camera handling, and audio system.
+- `js/app.js`: UI navigation and interactions.
+
+
+
+==================================================
+GITHUB PAGES HOSTING INSTRUCTIONS
+==================================================
+
+Once your code is on GitHub, here is exactly how to run this project perfectly 
+live on the internet for free using GitHub Pages:
+
+### Step 1: Enable GitHub Pages
+Because your project is pure HTML, CSS, and Vanilla JavaScript (no complex backends), 
+it runs directly on GitHub.
+
+1. Go to your GitHub repository in your web browser.
+2. Near the top right, click on the **Settings** tab.
+3. On the left sidebar menu, scroll down to the 'Code and automation' section and click **Pages**.
+4. Under the **"Build and deployment"** setup area:
+   - For **Source**, ensure it says 'Deploy from a branch'.
+   - Under **Branch**, change 'None' to **main**.
+   - Leave the folder dropdown as '/ (root)'.
+5. Click the **Save** button.
+
+### Step 2: Wait for Deployment
+1. GitHub will automatically start building your live website.
+2. Click the **Actions** tab at the top of your repo. You will see a workflow running.
+3. Wait 30 seconds to 1 minute until this turns into a green checkmark.
+
+### Step 3: View Your Live Website
+Once it completes:
+1. Go back to the **Settings > Pages** menu.
+2. At the top of the page, a new section will appear saying: 
+   "Your site is live at: https://[YourUsername].github.io/[RepositoryName]"
+3. Click that link!
+
+### Why this works perfectly "as is"
+Because this is a Vanilla HTML/JS/CSS app, GitHub immediately serves the `index.html` file 
+right away, handling all the complex Mediapipe WebAssembly logic right in the browser. 
+Furthermore, unlike opening an HTML file directly from your computer, GitHub provides an 
+https:// secured URL, meaning the browser will securely perfectly allow webcam access 
+identical to your local test environment.
