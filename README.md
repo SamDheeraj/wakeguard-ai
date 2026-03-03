@@ -36,19 +36,6 @@ The key decisions behind this:
 - Vanilla JavaScript
 - HTML + CSS
 
-## Running Locally
-
-Browsers block webcam access on `file://` URLs, so you need to serve it over HTTP:
-
-**Python:**
-```bash
-python3 -m http.server
-```
-Open `http://localhost:8000` in your browser.
-
-**VS Code:**  
-Install the Live Server extension → right-click `index.html` → Open with Live Server.
-
 ## Live Demo
 
 Hosted on GitHub Pages: [samdheeraj.github.io/wakeguard-ai](https://samdheeraj.github.io/wakeguard-ai)
